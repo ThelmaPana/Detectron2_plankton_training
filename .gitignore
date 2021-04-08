@@ -1,0 +1,10 @@
+__pycache__/
+.ipynb_checkpoints/
+.Rhistory
+.Rproj.user/
+.secrets/
+.Rhistory
+old_detectron2_plankton_training.ipynb
+tuto/
+output/*
+data/*
