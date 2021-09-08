@@ -25,6 +25,7 @@ import detectron2
 
 # import some common libraries
 import numpy as np
+import pandas as pd
 import os
 import json
 import cv2
@@ -43,7 +44,7 @@ from detectron2 import model_zoo
 from detectron2.config import get_cfg
 from detectron2.utils.visualizer import Visualizer, ColorMode
 from detectron2.data import MetadataCatalog, DatasetCatalog, build_detection_train_loader, build_detection_test_loader, DatasetMapper
-from detectron2.evaluation import COCOEvaluator, inference_on_dataset, inference_context
+from detectron2.evaluation import COCOEvaluator, inference_on_dataset, inference_context, DatasetEvaluator
 from detectron2.engine import DefaultPredictor, DefaultTrainer
 
 # import custom functions
@@ -51,7 +52,7 @@ import lib.training_functions as training_functions
 
 ###################################### Settings ######################################
 # Directory to dataset
-data_dir = 'data/detectron2_dataset'
+data_dir = 'data/detectron2_dataset_400'
 
 # Set output_dir
 output_dir = os.path.join('output', '_'.join(['output', datetime.datetime.now().strftime("%Y%m%d-%H%M%S-%f")]))
@@ -62,20 +63,20 @@ show_training = True # Whether to show a few frames from training set
 base_model = 'COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml'
 
 ims_per_batch = 32 # batch size
-max_iter = 30 
+max_iter = 30000
 batch_size_per_image = 512 # default is 512
 num_classes = 1  # only has one class (plankton)
 
-base_lr = 0.00005 #  LR 0.000025 for BS=2
-solver_gamma = 0.1 
+base_lr = 0.0005 #  LR 0.000025 for BS=2
+solver_gamma = 0.1
 solver_steps = (max_iter//3, 2*max_iter//3) # the iteration number to decrease learning rate by GAMMA
 solver_warmup_factor = 1.0 / 1000
-solver_warmup_iters = 1000
+solver_warmup_iters = 100
 solver_warmup_method = 'linear'
 solver_checkpoint_period = 100 # save a checkpoint after every this number of iterations
 eval_period = 1000 # run evaluation on validation set after this number of iterations
 
-test_threshold = 0.6 # score above which to consider objects for testing. Low for better recall, high for better accuracy.
+test_threshold = 0.1 # score above which to consider objects for testing. Low for better recall, high for better precision.
 
 ######################################################################################
 
@@ -125,7 +126,7 @@ cfg.merge_from_file(model_zoo.get_config_file(base_model))
 cfg.DATASETS.TRAIN = ('plankton_train',) # Training set
 cfg.DATASETS.TEST = ('plankton_valid',) # Validation set
 
-cfg.DATALOADER.NUM_WORKERS = 2
+cfg.DATALOADER.NUM_WORKERS = 8
 cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(base_model)  # Let training initialize from model zoo
 cfg.MODEL.ROI_HEADS.BATCH_SIZE_PER_IMAGE = batch_size_per_image   
 cfg.MODEL.ROI_HEADS.NUM_CLASSES = num_classes  
@@ -159,15 +160,34 @@ print('Done training')
 ## Model evaluation
 cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, 'model_final.pth') # Load final model
 cfg.DATASETS.TEST = ('plankton_test', ) # test set for model evaluation
-predictor = DefaultPredictor(cfg) # Load default predictor
+#predictor = DefaultPredictor(cfg) # Load default predictor
 
 # We evaluate its performance using AP metric implemented in COCO API.
-evaluator = COCOEvaluator('plankton_test', cfg, False, output_dir=output_dir)
+evaluator = COCOEvaluator('plankton_test', output_dir=output_dir)
 test_loader = build_detection_test_loader(cfg, 'plankton_test')
 test_results = inference_on_dataset(trainer.model, test_loader, evaluator)
+test_results
 
 # Write test results
 with open(os.path.join(output_dir, 'test_results.pickle'),'wb') as test_file:
     pickle.dump(test_results, test_file)
+
+
+## Other evaluation to plot precision VS recall
+model = trainer.model # get model
+model.eval() # switch to evaluation mode
+# choose custom evaluator
+evaluator = training_functions.my_evaluator()
+evaluator.reset() # reset evaluator
+
+test_dataset_dicts = training_functions.format_bbox(os.path.join(data_dir, 'test')) 
+for image_id, gt_annots, outputs in training_functions.get_all_inputs_outputs(test_loader, test_dataset_dicts, model):
+    evaluator.process(image_id, gt_annots, outputs)
+
+mAP = evaluator.evaluate(output_dir = output_dir)
+
+# write results
+with open(os.path.join(output_dir, 'map.pickle'),'wb') as test_file:
+    pickle.dump({'mAP': mAP}, test_file)
 
 

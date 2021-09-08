@@ -41,7 +41,7 @@ import lib.dataset_functions as dataset_functions # my functions
 
 ######################################## Settings ########################################
 # Directory where to write output frames
-output_dir = 'data/detectron2_dataset'
+output_dir = 'data/detectron2_dataset_400'
 # If it doesn't exist, create it
 if not os.path.exists(output_dir):
     os.mkdir(output_dir)
@@ -65,7 +65,7 @@ output_shape = [output_size, output_size]
 
 # Size of particles to consider
 min_area = 50
-max_area = 300
+max_area = 400
 
 # Data augmentation
 zoom_range = 0.2 # maximum zoom range (e.g. 0.2 will allow zoom in or out of 20%)
@@ -88,7 +88,7 @@ split = [70, 15, 15] # split for training / validation / test
 
 ## Process objects exported from ecotaxa
 # Read exported from EcoTaxa
-eco_exp = pd.read_csv('data/ecotaxa_export.csv')
+eco_exp = pd.read_csv('data/ecotaxa_export_training_set.csv')
 
 # Ignore objects outside of size range
 eco_exp = eco_exp[(eco_exp['area'] > min_area) & (eco_exp['area'] < max_area)].reset_index(drop=True)

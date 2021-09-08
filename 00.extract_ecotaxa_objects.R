@@ -157,6 +157,6 @@ obj <- obj %>%
 ## Write table ----
 #--------------------------------------------------------------------------#
 # Write to csv
-write_csv(obj, file = "data/ecotaxa_export.csv")
+write_csv(obj, file = "data/ecotaxa_export_training_set.csv")
 
 
